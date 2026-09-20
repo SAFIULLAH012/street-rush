@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Street Rush - Endless Highway Racer</title>
+  <meta name="description" content="A high-octane mobile-first endless highway browser racing game. Dodge traffic, trigger near misses, engage nitro, and survive the rush.">
+
+  <!-- PWA: Web App Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- PWA: Theme Color (browser UI & Android splash screen) -->
+  <meta name="theme-color" content="#00f0ff">
+  <meta name="background_color" content="#08090d">
+
+  <!-- PWA: iOS / Apple Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Street Rush">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- PWA: Windows / MS Tiles -->
+  <meta name="msapplication-TileImage" content="icon-192.png">
+  <meta name="msapplication-TileColor" content="#00f0ff">
+
+  <!-- App Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <!-- Main Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Visual Effects Overlay -->
+    <div id="damage-vignette"></div>
+    <div id="speed-warp-overlay"></div>
+
+    <!-- IN-GAME HUD -->
+    <div id="game-hud" class="ui-layer hud-hidden">
+      <!-- Top Bar -->
+      <div class="hud-top-bar">
+        <div class="hud-stat-box">
+          <span class="hud-label">DISTANCE</span>
+          <span id="hud-distance" class="hud-value">0.00 km</span>
+        </div>
+
+        <div class="hud-mission-chip" id="hud-mission-chip">
+          <span class="mission-icon">🎯</span>
+          <span id="hud-mission-text" class="mission-text">Overtake 20 cars</span>
+          <div class="mission-mini-bar"><div id="hud-mission-fill" class="mission-mini-fill"></div></div>
+        </div>
+
+        <div class="hud-stat-box score-box">
+          <span class="hud-label">SCORE</span>
+          <span id="hud-score" class="hud-value highlight">0</span>
+        </div>
+
+        <button id="btn-pause" class="icon-btn" aria-label="Pause Game" title="Pause (P)">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <rect x="5" y="4" width="4" height="16" rx="1"/>
+            <rect x="15" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Combo & Near Miss Banner -->
+      <div id="hud-combo-container" class="combo-hidden">
+        <div id="hud-combo-badge" class="combo-badge">COMBO <span id="hud-combo-multiplier">x2</span></div>
+        <div class="combo-timer-bar"><div id="hud-combo-timer-fill"></div></div>
+      </div>
+
+      <!-- Floating Near Miss / Mission Notifications -->
+      <div id="hud-feed"></div>
+
+      <!-- Bottom Cockpit HUD -->
+      <div class="hud-cockpit">
+        <!-- Health Meter -->
+        <div class="cockpit-module health-module">
+          <div class="module-header">
+            <span class="hud-label">VEHICLE INTEGRITY</span>
+            <span id="hud-health-num" class="hud-subvalue">100%</span>
+          </div>
+          <div class="health-bar-track">
+            <div id="hud-health-fill" class="health-bar-fill"></div>
+          </div>
+          <div class="health-pips">
+            <div class="pip" id="pip-1"></div>
+            <div class="pip" id="pip-2"></div>
+            <div class="pip" id="pip-3"></div>
+          </div>
+        </div>
+
+        <!-- Center Speedometer -->
+        <div class="cockpit-module speed-module">
+          <div class="speed-dial-wrap">
+            <svg class="speed-arc-svg" viewBox="0 0 160 90">
+              <path class="arc-bg" d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8" stroke-linecap="round"/>
+              <path id="hud-speed-arc" class="arc-fill" d="M 20 80 A 60 60 0 0 1 140 80" fill="none" stroke="#00f0ff" stroke-width="8" stroke-dasharray="188.5" stroke-dashoffset="188.5" stroke-linecap="round"/>
+            </svg>
+            <div class="speed-number-wrap">
+              <span id="hud-speed-val" class="speed-number">0</span>
+              <span class="speed-unit">KM/H</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nitro Meter -->
+        <div class="cockpit-module nitro-module">
+          <div class="module-header">
+            <span class="hud-label">NITRO BOOST</span>
+            <span id="hud-nitro-num" class="hud-subvalue">READY</span>
+          </div>
+          <div class="nitro-bar-track">
+            <div id="hud-nitro-fill" class="nitro-bar-fill"></div>
+          </div>
+          <div class="nitro-hint">SPACE / NITRO</div>
+        </div>
+      </div>
+
+      <!-- MOBILE TOUCH CONTROLS (Only active on touch devices or small screens) -->
+      <div id="mobile-touch-controls" class="touch-controls-layer">
+        <!-- Left Side: Steering -->
+        <div class="touch-cluster left-cluster">
+          <button id="touch-left" class="touch-btn steer-btn" aria-label="Steer Left">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+              <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+            </svg>
+          </button>
+          <button id="touch-right" class="touch-btn steer-btn" aria-label="Steer Right">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="currentColor">
+              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Right Side: Gas, Brake, Nitro -->
+        <div class="touch-cluster right-cluster">
+          <button id="touch-brake" class="touch-btn action-btn brake-btn" aria-label="Brake">
+            <span>BRAKE</span>
+          </button>
+          <button id="touch-nitro" class="touch-btn action-btn nitro-btn" aria-label="Nitro Boost">
+            <span>NOS</span>
+          </button>
+          <button id="touch-gas" class="touch-btn action-btn gas-btn" aria-label="Accelerate">
+            <span>GAS</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREENS & MODALS -->
+
+    <!-- 1. MAIN MENU -->
+    <div id="screen-menu" class="ui-layer screen-visible">
+      <div class="menu-content">
+        <div class="brand-badge">HIGHWAY PURSUIT</div>
+        <h1 class="game-logo">STREET<span class="logo-accent">RUSH</span></h1>
+        <p class="game-tagline">Push the limits. Overtake the pack. Survive the highway.</p>
+
+        <div class="menu-car-preview-wrap">
+          <button id="btn-menu-prev-car" class="carousel-arrow sm-arrow" aria-label="Previous Car">&#10094;</button>
+          <div class="menu-car-preview" id="menu-car-clickable" title="Click to view in Garage">
+            <canvas id="menu-car-canvas" width="220" height="130"></canvas>
+            <div class="menu-selected-car" id="menu-selected-car-name">VIPER GT</div>
+            <span class="menu-car-hint">Tap car or arrows to change</span>
+          </div>
+          <button id="btn-menu-next-car" class="carousel-arrow sm-arrow" aria-label="Next Car">&#10095;</button>
+        </div>
+
+        <div class="menu-buttons">
+          <button id="btn-play" class="btn btn-primary btn-large">
+            <span class="btn-glow"></span>
+            <span class="btn-text">START RACE</span>
+          </button>
+          <button id="btn-garage" class="btn btn-secondary">GARAGE & CAR SPECS</button>
+          <button id="btn-missions" class="btn btn-secondary">MISSIONS</button>
+          <button id="btn-highscores" class="btn btn-secondary">HIGH SCORES</button>
+          <button id="btn-settings" class="btn btn-secondary">SETTINGS</button>
+        </div>
+
+        <div class="desktop-controls-hint">
+          <span>Controls: <strong>WASD</strong> / <strong>Arrows</strong> to Steer & Throttle &bull; <strong>Space</strong> for Nitro &bull; <strong>P</strong> to Pause</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. GARAGE SCREEN -->
+    <div id="screen-garage" class="ui-layer screen-hidden">
+      <div class="garage-content">
+        <div class="screen-header">
+          <h2 class="screen-title">VEHICLE <span class="logo-accent">GARAGE</span></h2>
+          <p class="screen-subtitle">Select your highway weapon. Each vehicle features distinct physics handling.</p>
+        </div>
+
+        <div class="garage-showroom">
+          <button id="btn-garage-prev" class="carousel-arrow left-arrow" aria-label="Previous Car">&#10094;</button>
+          
+          <div class="garage-stage">
+            <div class="garage-pedestal"></div>
+            <canvas id="garage-car-canvas" width="280" height="180"></canvas>
+            <div id="garage-car-class" class="car-badge">BALANCED PERFORMANCE</div>
+            <h3 id="garage-car-name" class="garage-car-title">VIPER GT</h3>
+            <p id="garage-car-desc" class="garage-car-desc">A perfectly balanced American sports coupe featuring dependable grip and solid top speed.</p>
+          </div>
+
+          <button id="btn-garage-next" class="carousel-arrow right-arrow" aria-label="Next Car">&#10095;</button>
+        </div>
+
+        <!-- Car Statistics -->
+        <div class="car-stats-card">
+          <div class="stat-row">
+            <span class="stat-name">TOP SPEED</span>
+            <div class="stat-bar-bg"><div id="stat-speed-bar" class="stat-bar-fill"></div></div>
+            <span id="stat-speed-val" class="stat-num">210 km/h</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-name">ACCELERATION</span>
+            <div class="stat-bar-bg"><div id="stat-accel-bar" class="stat-bar-fill"></div></div>
+            <span id="stat-accel-val" class="stat-num">8.2 / 10</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-name">HANDLING</span>
+            <div class="stat-bar-bg"><div id="stat-handling-bar" class="stat-bar-fill"></div></div>
+            <span id="stat-handling-val" class="stat-num">7.5 / 10</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-name">BRAKING</span>
+            <div class="stat-bar-bg"><div id="stat-brake-bar" class="stat-bar-fill"></div></div>
+            <span id="stat-brake-val" class="stat-num">8.0 / 10</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-name">NITRO POWER</span>
+            <div class="stat-bar-bg"><div id="stat-nitro-bar" class="stat-bar-fill nitro-fill-color"></div></div>
+            <span id="stat-nitro-val" class="stat-num">100%</span>
+          </div>
+        </div>
+
+        <div class="garage-actions">
+          <button id="btn-garage-race-now" class="btn btn-primary btn-large">
+            <span class="btn-glow"></span>
+            <span class="btn-text">🏁 RACE WITH THIS CAR</span>
+          </button>
+          <button id="btn-select-car" class="btn btn-secondary">SELECT VEHICLE</button>
+          <button id="btn-garage-back" class="btn btn-secondary">BACK TO MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. MISSIONS MODAL -->
+    <div id="modal-missions" class="modal-layer modal-hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="modal-title">HIGHWAY <span class="logo-accent">MISSIONS</span></h3>
+          <button id="btn-close-missions" class="close-btn">&times;</button>
+        </div>
+        <p class="modal-intro">Complete highway objectives during your runs to claim street prestige.</p>
+        <div id="missions-list" class="missions-container">
+          <!-- Populated by JavaScript -->
+        </div>
+        <button id="btn-missions-done" class="btn btn-primary modal-action-btn">DONE</button>
+      </div>
+    </div>
+
+    <!-- 4. HIGH SCORES MODAL -->
+    <div id="modal-highscores" class="modal-layer modal-hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="modal-title">CAREER <span class="logo-accent">RECORDS</span></h3>
+          <button id="btn-close-highscores" class="close-btn">&times;</button>
+        </div>
+        <div class="scores-grid">
+          <div class="score-card">
+            <span class="score-card-label">ALL-TIME BEST SCORE</span>
+            <span id="stat-best-score" class="score-card-val highlight">0</span>
+          </div>
+          <div class="score-card">
+            <span class="score-card-label">LONGEST DISTANCE</span>
+            <span id="stat-longest-dist" class="score-card-val">0.00 km</span>
+          </div>
+          <div class="score-card">
+            <span class="score-card-label">HIGHEST SPEED RECORD</span>
+            <span id="stat-highest-speed" class="score-card-val">0 km/h</span>
+          </div>
+          <div class="score-card">
+            <span class="score-card-label">TOTAL NEAR MISSES</span>
+            <span id="stat-total-nearmisses" class="score-card-val">0</span>
+          </div>
+          <div class="score-card">
+            <span class="score-card-label">BEST COMBO STREAK</span>
+            <span id="stat-best-combo" class="score-card-val">x0</span>
+          </div>
+        </div>
+        <button id="btn-highscores-done" class="btn btn-primary modal-action-btn">CLOSE</button>
+      </div>
+    </div>
+
+    <!-- 5. SETTINGS MODAL -->
+    <div id="modal-settings" class="modal-layer modal-hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 class="modal-title">GAME <span class="logo-accent">SETTINGS</span></h3>
+          <button id="btn-close-settings" class="close-btn">&times;</button>
+        </div>
+        <div class="settings-list">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Camera Screen Shake</span>
+              <span class="setting-desc">Simulate heavy impact and high speed road vibration.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-screen-shake" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">Touch Controls Opacity</span>
+              <span class="setting-desc">Adjust the visibility of on-screen buttons on mobile.</span>
+            </div>
+            <input type="range" id="setting-touch-opacity" min="30" max="100" value="80">
+          </div>
+
+          <div class="setting-item reset-item">
+            <div class="setting-info">
+              <span class="setting-name text-danger">Reset Saved Career</span>
+              <span class="setting-desc">Clears high scores and mission records from localStorage.</span>
+            </div>
+            <button id="btn-reset-data" class="btn btn-danger btn-sm">RESET DATA</button>
+          </div>
+        </div>
+        <button id="btn-settings-done" class="btn btn-primary modal-action-btn">SAVE & CLOSE</button>
+      </div>
+    </div>
+
+    <!-- 6. PAUSE SCREEN -->
+    <div id="screen-pause" class="ui-layer screen-hidden">
+      <div class="pause-box">
+        <h2 class="pause-title">GAME <span class="logo-accent">PAUSED</span></h2>
+        <div class="pause-stats-summary">
+          <div><span class="hud-label">CURRENT SPEED</span><span id="pause-speed">0 km/h</span></div>
+          <div><span class="hud-label">DISTANCE</span><span id="pause-dist">0.00 km</span></div>
+          <div><span class="hud-label">SCORE</span><span id="pause-score">0</span></div>
+        </div>
+        <div class="pause-buttons">
+          <button id="btn-pause-resume" class="btn btn-primary btn-large">RESUME</button>
+          <button id="btn-pause-restart" class="btn btn-secondary">RESTART RACE</button>
+          <button id="btn-pause-menu" class="btn btn-secondary">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. GAME OVER SCREEN -->
+    <div id="screen-gameover" class="ui-layer screen-hidden">
+      <div class="gameover-box">
+        <div class="wreck-badge">CRITICAL COLLISION</div>
+        <h2 class="gameover-title">TOTAL <span class="danger-accent">WRECK</span></h2>
+
+        <div id="gameover-new-record" class="new-record-banner record-hidden">🏆 NEW ALL-TIME RECORD!</div>
+
+        <div class="gameover-stats-grid">
+          <div class="stat-cell">
+            <span class="cell-label">FINAL SCORE</span>
+            <span id="go-score" class="cell-val highlight">0</span>
+          </div>
+          <div class="stat-cell">
+            <span class="cell-label">TOTAL DISTANCE</span>
+            <span id="go-dist" class="cell-val">0.00 km</span>
+          </div>
+          <div class="stat-cell">
+            <span class="cell-label">TOP SPEED HIT</span>
+            <span id="go-speed" class="cell-val">0 km/h</span>
+          </div>
+          <div class="stat-cell">
+            <span class="cell-label">NEAR MISSES</span>
+            <span id="go-nearmiss" class="cell-val">0</span>
+          </div>
+          <div class="stat-cell span-2">
+            <span class="cell-label">BEST COMBO</span>
+            <span id="go-combo" class="cell-val">x0</span>
+          </div>
+        </div>
+
+        <div class="gameover-actions">
+          <button id="btn-go-restart" class="btn btn-primary btn-large">
+            <span class="btn-glow"></span>
+            <span class="btn-text">PLAY AGAIN</span>
+          </button>
+          <button id="btn-go-garage" class="btn btn-secondary">GARAGE</button>
+          <button id="btn-go-menu" class="btn btn-secondary">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Game Script -->
+  <script src="game.js"></script>
+
+  <!-- PWA: Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('Street Rush: Service Worker registered ✅'))
+          .catch((err) => console.warn('Service Worker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

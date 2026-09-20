@@ -1,0 +1,27 @@
+{
+  "name": "Street Rush - Highway Racer",
+  "short_name": "Street Rush",
+  "description": "Endless highway arcade racing game. Dodge traffic, use nitro, survive the rush!",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait-primary",
+  "background_color": "#08090d",
+  "theme_color": "#00f0ff",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "lang": "en"
+}
