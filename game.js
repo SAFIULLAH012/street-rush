@@ -1015,19 +1015,26 @@ class Renderer {
   }
 
   resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.canvas.width = this.width * dpr;
     this.canvas.height = this.height * dpr;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
 
     // Virtual world scaling
     const roadTotalWidth = CONFIG.ROAD.LANES * CONFIG.ROAD.LANE_WIDTH + CONFIG.ROAD.SHOULDER_WIDTH * 2;
-    // Fit road comfortably in viewport width
-    this.scale = Math.min(1.0, (this.width * 0.92) / roadTotalWidth);
-    if (this.width > 768) {
-      this.scale = Math.min(1.25, (this.height * 0.85) / 700);
+    
+    if (this.width <= 480) {
+      // Mobile portrait: scale road so it leaves comfortable room on both sides
+      this.scale = Math.min(0.78, (this.width * 0.74) / roadTotalWidth);
+    } else if (this.width <= 768) {
+      // Mobile landscape / phablet
+      this.scale = Math.min(0.9, (this.width * 0.8) / roadTotalWidth);
+    } else {
+      // Desktop / Tablet
+      this.scale = Math.min(1.2, (this.height * 0.82) / 650);
     }
   }
 
@@ -1101,8 +1108,9 @@ class Renderer {
 
     // 2. Center Game Camera on Player
     ctx.save();
-    // Anchor camera around 82% down the screen (gives maximum forward highway sight)
-    const cameraY = h * 0.82;
+    // Anchor camera according to screen height
+    const isMobile = this.width <= 768;
+    const cameraY = isMobile ? h * 0.74 : h * 0.82;
     ctx.translate(w / 2, cameraY);
     ctx.scale(this.scale, this.scale);
     // Camera moves with player.y (so highway scrolls downward)
